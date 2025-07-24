@@ -1,0 +1,43 @@
+version: 2.1 #config syntax
+
+orbs: #imports
+  aws-ecr: circleci/aws-ecr@9.0.1
+  aws-cli: circleci/aws-cli@4.1
+  node: circleci/node@5.1.0
+
+jobs:
+  build-and-push: #jobname
+    docker:
+      - image: cimg/node:18.20 #base circleci maintained image
+    steps:
+      - checkout
+
+      - setup_remote_docker
+
+      - run:
+          name: Install AWS CLI (in case the orb isn't enough)
+          command: |
+            sudo apt-get update && sudo apt-get install -y awscli
+
+      - run:
+          name: Set IMAGE_TAG from Git SHA
+          command: |
+            echo "export IMAGE_TAG=${CIRCLE_SHA1}" >> $BASH_ENV
+            source $BASH_ENV
+
+      - aws-ecr/build-and-push-image:
+          repo: "<< pipeline.parameters.ecr-repo >>"
+          tag: "${IMAGE_TAG}"
+          region: AWS_REGION
+          create-repo: true
+          path: .
+
+      - run:
+          name: Print Image URL
+          command: |
+            echo "Image pushed to: ${ECR_REPO}:${IMAGE_TAG}"
+
+parameters:
+  ecr-repo:
+    type: string
+    default: "sample-node-app"
